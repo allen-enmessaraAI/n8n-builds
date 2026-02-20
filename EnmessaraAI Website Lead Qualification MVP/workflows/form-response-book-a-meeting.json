@@ -1,0 +1,514 @@
+{
+    "name": "Form Response_Book a Meeting",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "form-submit",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "id": "webhook-netlify",
+            "name": "Netlify Form Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                224,
+                304
+            ],
+            "webhookId": "c8970616-8bfb-45de-ae93-bbb3109e755a"
+        },
+        {
+            "parameters": {
+                "respondWith": "noData",
+                "options": {}
+            },
+            "id": "respond-200-ok",
+            "name": "Respond 200 OK",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [
+                448,
+                112
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const items = $input.all();\nconst results = [];\nfor (const item of items) {\n  const data = item.json.body || item.json;\n  const firstName = (data[\"first-name\"] || data.first_name || \"\").trim();\n  const lastName = (data[\"last-name\"] || data.last_name || \"\").trim();\n  const email = (data.email || \"\").trim();\n  const company = (data.company || \"\").trim();\n  const website = (data.website || \"\").trim();\n  const role = (data.role || \"\").trim();\n  const companySize = (data[\"company-size\"] || data.company_size || \"\").trim();\n  const budget = (data.budget || \"\").trim();\n  const helpRequest = (data[\"help-request\"] || data.help_request || \"\").trim();\n  const improvementGoal = (data[\"improvement-goal\"] || data.improvement_goal || \"\").trim();\n  let rawPhone = (data.phone_number || data.phone || \"\").trim();\n  let digits = rawPhone.replace(/\\D/g, \"\");\n  if (digits.startsWith(\"1\") && digits.length === 11) { digits = digits.substring(1); }\n  let phone_number = digits.length === 10 ? \"+1\" + digits : \"incorrect_format\";\n  results.push({ json: { timestamp: new Date().toISOString(), first_name: firstName, last_name: lastName, phone_number: phone_number, email, company_name: company, company_website: website, role, company_size: companySize, budget, help_request: helpRequest, improvement_goal: improvementGoal } });\n}\nreturn results;"
+            },
+            "id": "code-standardize",
+            "name": "Standardize Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                448,
+                304
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const items = $input.all();\nconst results = [];\nfor (const item of items) {\n  const json = item.json;\n  const followUpPriority = json.budget && json.budget.toLowerCase().includes(qualified) ? P0 : P1;\n  const leadPayload = {\n    lead_source: netlify_form,\n    business: json.company_name || ,\n    first_name: json.first_name || ,\n    last_name: json.last_name || ,\n    company_name: json.company_name || ,\n    email: json.email || ,\n    phone_number: json.phone_number || ,\n    request: json.help_request || ,\n    budget: json.budget || ,\n    follow_up_priority: followUpPriority,\n    created_at: json.timestamp || new Date().toISOString(),\n    call_id: null\n  };\n  results.push({ json: leadPayload });\n}\nreturn results;"
+            },
+            "id": "code-lead-payload",
+            "name": "Create Lead Payload",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2000,
+                576
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 1
+                    },
+                    "conditions": [
+                        {
+                            "id": "phone-check",
+                            "leftValue": "={{ $json.phone_number }}",
+                            "rightValue": "incorrect_format",
+                            "operator": {
+                                "type": "string",
+                                "operation": "notEquals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "if-phone-valid",
+            "name": "Phone Valid?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                896,
+                384
+            ]
+        },
+        {
+            "parameters": {
+                "documentId": {
+                    "__rl": true,
+                    "value": "1Cn7HeSHXnsnvD64IFJ0aGn1EtMVg99btkxki2S-0OVo",
+                    "mode": "list",
+                    "cachedResultName": "Enmessara AI Lead Followup Sheet",
+                    "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Cn7HeSHXnsnvD64IFJ0aGn1EtMVg99btkxki2S-0OVo/edit?usp=drivesdk"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "gid=0",
+                    "mode": "list"
+                },
+                "options": {}
+            },
+            "id": "gsheet-invalid-phone",
+            "name": "Log Invalid Phone",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.5,
+            "position": [
+                1040,
+                608
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "u6RFcpVuaIGCIK3Y",
+                    "name": "Enmessara AI LeadFollowup"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.retellai.com/v2/create-phone-call",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer key_964bce25bf7f77e7696edf54fd96"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ agent_id: \"agent_74e6b4ff0b708d2e6193fb0fd3\", from_number: \"+17252289486\", to_number: $json.phone_number, retell_llm_dynamic_variables: { first_name: $json.first_name, company: $json.company_name, role: $json.role, company_size: $json.company_size, improvement_goal: $json.improvement_goal, help_request: $json.help_request } }) }}",
+                "options": {}
+            },
+            "id": "http-call-lead",
+            "name": "Call Lead",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1136,
+                416
+            ]
+        },
+        {
+            "parameters": {
+                "amount": 60
+            },
+            "id": "wait-for-call",
+            "name": "Wait for Call",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                1328,
+                448
+            ],
+            "webhookId": "bdc27f2f-5c73-4aa3-90a3-6b625a54cf31"
+        },
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "enmessara-retell-webhook",
+                "options": {}
+            },
+            "id": "webhook-retell",
+            "name": "Retell Call Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                1552,
+                448
+            ],
+            "webhookId": "54f5af91-8cbf-4957-9dff-48617bb26e02"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": ""
+                    },
+                    "conditions": [
+                        {
+                            "id": "event-filter",
+                            "leftValue": "={{ $json.body.event || $json.event }}",
+                            "rightValue": "call_analyzed",
+                            "operator": {
+                                "type": "string",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "filter-call-analyzed",
+            "name": "Filter call_analyzed",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                1776,
+                448
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const items = $input.all();\nconst results = [];\nfor (const item of items) {\n  const data = item.json.body || item.json;\n  const call = data.call || data;\n  const analysis = call.call_analysis || {};\n  const customData = analysis.custom_analysis_data || call.custom_analysis_data || {};\n  results.push({ json: { timestamp: new Date().toISOString(), first_name: customData.first_name || \"\", last_name: customData.last_name || \"\", phone_number: customData.phone_number || call.to_number || \"\", email: customData.email || \"\", company_name: customData.company_name || \"\", role: customData.role || \"\", request: customData.request || \"\", company_size: customData.company_size || \"\", service_interested: customData.service_interested || false, motivation: customData.motivation || \"\", urgency: customData.urgency || \"\", budget: customData.budget || \"\", intent: customData.intent || false, voicemail: customData.voicemail || (call.disconnection_reason === \"voicemail\") || false, call_status: call.disconnection_reason === \"voicemail\" ? \"Voicemail\" : (call.call_status === \"ended\" ? \"Complete\" : \"No Answer\") } });\n}\nreturn results;"
+            },
+            "id": "code-extract-data",
+            "name": "Extract Call Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1984,
+                352
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": ""
+                    },
+                    "conditions": [
+                        {
+                            "id": "voicemail-check",
+                            "leftValue": "={{ $json.voicemail }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "if-voicemail",
+            "name": "Voicemail?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                2208,
+                432
+            ]
+        },
+        {
+            "parameters": {
+                "documentId": {
+                    "__rl": true,
+                    "value": "1Cn7HeSHXnsnvD64IFJ0aGn1EtMVg99btkxki2S-0OVo",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "Sheet1",
+                    "mode": "list"
+                },
+                "options": {}
+            },
+            "id": "gsheet-voicemail",
+            "name": "Log Voicemail",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.5,
+            "position": [
+                2432,
+                208
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "R5xA4SFOGILiK5PE",
+                    "name": "SalesAgent Challenge OAuth"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "documentId": {
+                    "__rl": true,
+                    "value": "1Cn7HeSHXnsnvD64IFJ0aGn1EtMVg99btkxki2S-0OVo",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "Sheet1",
+                    "mode": "list"
+                },
+                "options": {}
+            },
+            "id": "gsheet-complete",
+            "name": "Log Call Complete",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.5,
+            "position": [
+                2432,
+                480
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "R5xA4SFOGILiK5PE",
+                    "name": "SalesAgent Challenge OAuth"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "sendTo": "hello@enmessara.ai",
+                "subject": "=\ud83d\udd25 Lead Follow-Up Summary: {{ $json.first_name }} {{ $json.last_name }} - {{ $json.call_status }}",
+                "message": "=<h2>Call Summary Report</h2><p><strong>Status:</strong> {{ $json.call_status }}</p><p><strong>Name:</strong> {{ $json.first_name }} {{ $json.last_name }}</p><p><strong>Email:</strong> {{ $json.email }}</p><p><strong>Phone:</strong> {{ $json.phone_number }}</p><p><strong>Company:</strong> {{ $json.company_name }}</p><p><strong>Role:</strong> {{ $json.role }}</p><p><strong>Request:</strong> {{ $json.request }}</p><p><strong>Budget:</strong> {{ $json.budget }}</p><p><strong>Motivation:</strong> {{ $json.motivation }}</p><p><strong>Urgency:</strong> {{ $json.urgency }}</p><p><strong>Intent:</strong> {{ $json.intent }}</p><p><strong>Timestamp:</strong> {{ $json.timestamp }}</p>",
+                "options": {
+                    "appendAttribution": false,
+                    "senderName": "Enmessara AI"
+                }
+            },
+            "id": "gmail-followup",
+            "name": "Gmail Follow-Up",
+            "type": "n8n-nodes-base.gmail",
+            "typeVersion": 2.1,
+            "position": [
+                2656,
+                352
+            ],
+            "webhookId": "57fea771-2b55-4814-acf6-017e9d3bae4e",
+            "credentials": {
+                "gmailOAuth2": {
+                    "id": "yVFnpq5XYP66G9Sh",
+                    "name": "Notification: Follow Up Lead"
+                }
+            }
+        }
+    ],
+    "connections": {
+        "Netlify Form Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Respond 200 OK",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Standardize Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Standardize Data": {
+            "main": [
+                [
+                    {
+                        "node": "Phone Valid?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Phone Valid?": {
+            "main": [
+                [
+                    {
+                        "node": "Call Lead",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Log Invalid Phone",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Call Lead": {
+            "main": [
+                [
+                    {
+                        "node": "Wait for Call",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Wait for Call": {
+            "main": [
+                [
+                    {
+                        "node": "Retell Call Webhook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Retell Call Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Filter call_analyzed",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Filter call_analyzed": {
+            "main": [
+                [
+                    {
+                        "node": "Extract Call Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                []
+            ]
+        },
+        "Extract Call Data": {
+            "main": [
+                [
+                    {
+                        "node": "Create Lead Payload",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Create Lead Payload": {
+            "main": [
+                [
+                    {
+                        "node": "Voicemail?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Voicemail?": {
+            "main": [
+                [
+                    {
+                        "node": "Log Voicemail",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Log Call Complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Log Voicemail": {
+            "main": [
+                [
+                    {
+                        "node": "Gmail Follow-Up",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Log Call Complete": {
+            "main": [
+                [
+                    {
+                        "node": "Gmail Follow-Up",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1",
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false
+    },
+    "staticData": null,
+    "active": false,
+    "versionId": "40a008d4-d2bd-4ec8-bd43-9ab945702e92",
+    "id": "jRdguaKqotwfA1I8",
+    "description": null,
+    "meta": null,
+    "pinData": null,
+    "activeVersionId": null,
+    "updatedAt": "2026-02-20T09:08:59.432Z",
+    "createdAt": "2026-02-20T09:08:59.432Z",
+    "isArchived": false,
+    "versionCounter": 1,
+    "triggerCount": 0
+}
